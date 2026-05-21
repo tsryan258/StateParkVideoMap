@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Louisiana State Parks — RV Camping Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --G1:#1C322C; --G2:#2B4D44; --G3:#3D6B5F;
+  --Au:#9C7744; --Au2:#C4A06A;
+  --Cr:#FDFAF4; --Tn:#F3DBB6;
+  --Td:#1a1a18; --Tm:#4a4a46; --Ts:#7a7a74;
+  --Bd:rgba(28,50,44,0.1);
+  --S:'Source Sans 3',system-ui,sans-serif;
+  --F:'Playfair Display',Georgia,serif;
+}
+html,body{height:100%;font-family:var(--S);color:var(--Td);background:#f0ede6;overflow:hidden;}
+
+/* NAV */
+#nav{position:fixed;top:0;left:0;right:0;z-index:900;height:50px;background:var(--G1);border-bottom:2px solid var(--Au);display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+.nav-brand{display:flex;align-items:center;gap:9px;text-decoration:none;}
+.nav-title{font-family:var(--F);font-size:15px;font-weight:600;color:var(--Cr);line-height:1.1;display:block;}
+.nav-sub{font-size:9px;color:var(--Tn);text-transform:uppercase;letter-spacing:.14em;opacity:.7;display:block;}
+.nav-pill{font-size:10px;font-weight:600;background:var(--Tn);color:var(--G1);border-radius:20px;padding:3px 11px;}
+
+/* SHELL */
+#shell{position:fixed;top:50px;bottom:36px;left:0;right:0;display:flex;}
+
+/* SIDEBAR */
+#sidebar{width:248px;flex-shrink:0;background:#fff;border-right:1px solid var(--Bd);display:flex;flex-direction:column;overflow:hidden;z-index:200;}
+.sb-head{padding:10px 14px 8px;background:var(--Cr);border-bottom:1px solid var(--Bd);flex-shrink:0;}
+.sb-sup{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--Ts);display:block;margin-bottom:1px;}
+.sb-name{font-size:13.5px;font-weight:500;color:var(--Td);display:block;}
+#park-list{flex:1;overflow-y:auto;}
+#park-list::-webkit-scrollbar{width:3px;}
+#park-list::-webkit-scrollbar-thumb{background:rgba(28,50,44,.15);border-radius:2px;}
+.pi{display:flex;align-items:center;gap:9px;padding:8px 14px;cursor:pointer;border-bottom:1px solid rgba(28,50,44,.05);transition:background .1s;}
+.pi:hover{background:rgba(28,50,44,.03);}
+.pi.active{background:var(--G1);}
+.pi-dot{width:7px;height:7px;border-radius:50%;background:rgba(28,50,44,.18);flex-shrink:0;}
+.pi.live .pi-dot{background:var(--Au);box-shadow:0 0 0 3px rgba(156,119,68,.18);}
+.pi.active .pi-dot{background:var(--Tn);box-shadow:none;}
+.pi-text{flex:1;min-width:0;}
+.pi-name{font-size:12px;font-weight:500;color:var(--Td);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;}
+.pi.active .pi-name{color:var(--Cr);}
+.pi-city{font-size:10.5px;color:var(--Ts);font-weight:300;margin-top:1px;}
+.pi.active .pi-city{color:rgba(243,219,182,.72);}
+.pi-badge{font-size:9px;font-weight:700;letter-spacing:.04em;background:var(--Au);color:#fff;border-radius:8px;padding:2px 6px;flex-shrink:0;}
+.pi.active .pi-badge{background:var(--Tn);color:var(--G1);}
+
+/* MAP */
+#map-zone{flex:1;position:relative;overflow:hidden;}
+#map{width:100%;height:100%;}
+#map-tip{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:var(--G1);color:var(--Tn);font-size:11px;padding:6px 16px;border-radius:20px;pointer-events:none;z-index:500;box-shadow:0 2px 10px rgba(0,0,0,.22);border:1px solid rgba(156,119,68,.3);white-space:nowrap;transition:opacity .25s;}
+#map-tip.gone{opacity:0;}
+
+/* RIGHT PANEL */
+#panel{width:0;flex-shrink:0;background:var(--G1);border-left:2px solid var(--Au);overflow:hidden;transition:width .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;z-index:300;position:relative;}
+#panel.open{width:330px;}
+#panel-inner{width:330px;height:100%;display:flex;flex-direction:column;overflow:hidden;}
+
+#btn-x{position:absolute;top:7px;right:7px;z-index:10;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;}
+#btn-x:hover{background:rgba(0,0,0,.55);color:#fff;}
+
+/* VIDEO HERO — this is an <a> tag so clicking it goes straight to YouTube */
+#vid-hero{display:none;width:100%;flex-shrink:0;position:relative;overflow:hidden;background:#000;text-decoration:none;}
+#vid-hero.show{display:block;}
+#vid-hero::before{content:'';display:block;padding-top:56.25%;}
+#vid-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:opacity .2s;}
+#vid-hero:hover #vid-poster{opacity:.8;}
+#vid-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.6) 0%,rgba(0,0,0,.05) 55%,transparent 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;}
+#vid-play{width:58px;height:58px;border-radius:50%;background:rgba(220,50,50,.94);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,.45);transition:transform .15s,background .15s;pointer-events:none;}
+#vid-hero:hover #vid-play{transform:scale(1.08);background:#e00;}
+#vid-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.92);letter-spacing:.06em;text-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none;text-transform:uppercase;}
+
+/* COMING SOON */
+#vid-soon{width:100%;flex-shrink:0;background:rgba(0,0,0,.3);display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:28px 0;}
+#vid-soon.show{display:flex;}
+#vid-soon svg{opacity:.25;}
+#vid-soon span{font-size:11px;color:rgba(255,255,255,.3);font-weight:300;}
+
+/* PANEL BODY */
+#panel-body{flex:1;overflow-y:auto;padding:16px 18px;display:none;flex-direction:column;}
+#panel-body.show{display:flex;}
+#panel-body::-webkit-scrollbar{width:3px;}
+#panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+.p-name{font-family:var(--F);font-size:18px;font-weight:600;color:var(--Cr);line-height:1.2;margin-bottom:2px;}
+.p-loc{font-size:11.5px;color:var(--Tn);opacity:.7;font-style:italic;font-weight:300;margin-bottom:14px;}
+.dl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--Au2);opacity:.85;margin-bottom:3px;display:block;}
+.dv{font-size:12px;color:rgba(253,250,244,.82);line-height:1.5;font-weight:300;margin-bottom:13px;}
+.adv-head{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--Au2);opacity:.85;display:block;margin-bottom:8px;padding-top:14px;border-top:1px solid rgba(156,119,68,.2);}
+.adv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:16px;}
+.adv-btn{font-family:var(--S);font-size:10px;font-weight:600;color:var(--G1);background:var(--Tn);border:none;border-radius:5px;padding:6px 4px;cursor:pointer;text-align:center;line-height:1.3;display:flex;flex-direction:column;align-items:center;gap:2px;transition:background .12s,color .12s;}
+.adv-btn:hover{background:var(--Au2);color:#fff;}
+.adv-icon{font-size:15px;}
+.p-actions{margin-top:auto;display:flex;flex-direction:column;gap:7px;padding-top:12px;border-top:1px solid rgba(156,119,68,.18);}
+.btn-primary{display:block;width:100%;background:var(--Au);color:#fff;border:none;border-radius:5px;padding:10px 14px;font-size:12px;font-weight:600;font-family:var(--S);letter-spacing:.04em;cursor:pointer;text-decoration:none;text-align:center;transition:background .14s;}
+.btn-primary:hover{background:var(--Au2);}
+.btn-ghost{display:block;width:100%;background:transparent;color:var(--Tn);border:1px solid rgba(243,219,182,.25);border-radius:5px;padding:8px 14px;font-size:11.5px;font-family:var(--S);cursor:pointer;text-decoration:none;text-align:center;transition:border-color .14s,color .14s;}
+.btn-ghost:hover{border-color:var(--Tn);color:var(--Cr);}
+
+/* CS BODY */
+#cs-body{flex:1;overflow-y:auto;padding:16px 18px;display:none;flex-direction:column;}
+#cs-body.show{display:flex;}
+.cs-name{font-family:var(--F);font-size:18px;font-weight:600;color:var(--Cr);line-height:1.2;margin-bottom:3px;}
+.cs-loc{font-size:11.5px;color:var(--Tn);opacity:.7;font-style:italic;font-weight:300;margin-bottom:12px;}
+.cs-msg{font-size:12px;color:rgba(253,250,244,.45);line-height:1.6;font-weight:300;}
+.cs-actions{margin-top:auto;display:flex;flex-direction:column;gap:7px;padding-top:12px;border-top:1px solid rgba(156,119,68,.18);}
+
+/* LEAFLET POPUP */
+.leaflet-popup-content-wrapper{border-radius:8px!important;padding:0!important;border:1px solid var(--Bd)!important;box-shadow:0 4px 20px rgba(0,0,0,.14)!important;font-family:var(--S)!important;}
+.leaflet-popup-content{margin:0!important;}
+.pop-inner{padding:11px 14px 12px;}
+.pop-name{font-size:13px;font-weight:600;color:var(--G1);line-height:1.3;}
+.pop-city{font-size:11px;color:var(--Ts);font-weight:300;margin-top:1px;}
+.pop-vtag{margin-top:8px;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;background:var(--Au);color:#fff;padding:3px 9px;border-radius:10px;}
+
+/* ADVENTURE MODAL */
+#adv-modal{display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px;}
+#adv-modal.open{display:flex;}
+#am-box{background:var(--Cr);border-radius:12px;padding:30px 32px 26px;max-width:320px;width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.3);}
+#am-icon{font-size:36px;display:block;margin-bottom:10px;}
+#am-title{font-family:var(--F);font-size:20px;font-weight:600;color:var(--G1);margin-bottom:10px;}
+#am-text{font-size:13.5px;color:var(--Tm);line-height:1.65;font-weight:300;}
+#btn-am-close{margin-top:20px;background:var(--G1);color:var(--Cr);border:none;border-radius:6px;padding:10px 26px;font-size:12.5px;font-weight:500;font-family:var(--S);cursor:pointer;letter-spacing:.03em;transition:background .12s;}
+#btn-am-close:hover{background:var(--G2);}
+
+/* FOOTER */
+#footer{position:fixed;bottom:0;left:0;right:0;height:36px;background:var(--G1);border-top:1px solid rgba(156,119,68,.2);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:700;}
+.f-txt{font-size:10px;color:rgba(253,250,244,.35);font-weight:300;}
+.f-txt a{color:rgba(243,219,182,.45);text-decoration:none;}
+.f-txt a:hover{color:var(--Tn);}
+</style>
+</head>
+<body>
+
+<!-- ADVENTURE MODAL -->
+<div id="adv-modal">
+  <div id="am-box">
+    <span id="am-icon"></span>
+    <div id="am-title"></div>
+    <p id="am-text">This button will link to activity-specific short videos.</p>
+    <button id="btn-am-close">Got it</button>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a class="nav-brand" href="https://www.explorelouisiana.com/" target="_blank" rel="noopener">
+    <span style="font-size:20px;">⚜️</span>
+    <div>
+      <span class="nav-title">Explore Louisiana</span>
+      <span class="nav-sub">RV Travel Guide</span>
+    </div>
+  </a>
+  <span class="nav-pill">⛺ 20 RV State Parks</span>
+</nav>
+
+<!-- SHELL -->
+<div id="shell">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-head">
+      <span class="sb-sup">RV Camping Locations</span>
+      <span class="sb-name">20 Louisiana State Parks</span>
+    </div>
+    <div id="park-list"></div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map-zone">
+    <div id="map"></div>
+    <div id="map-tip">📍 Select a park to explore</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="panel">
+    <button id="btn-x" title="Close">✕</button>
+    <div id="panel-inner">
+
+      <!-- VIDEO HERO: plain <a> — one click goes straight to YouTube, no modal, no iframe -->
+      <a id="vid-hero" href="https://youtu.be/x5LTXLlYqD0" target="_blank" rel="noopener">
+        <img id="vid-poster" src="https://i.ytimg.com/vi/x5LTXLlYqD0/hqdefault.jpg" alt="South Toledo Bend State Park — watch on YouTube"/>
+        <div id="vid-overlay">
+          <div id="vid-play">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><polygon points="6,3 20,12 6,21"/></svg>
+          </div>
+          <span id="vid-label">▶ Watch on YouTube</span>
+        </div>
+      </a>
+
+      <!-- COMING SOON placeholder for other parks -->
+      <div id="vid-soon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span>Video coming soon</span>
+      </div>
+
+      <!-- LIVE PARK DETAIL -->
+      <div id="panel-body">
+        <div class="p-name" id="p-name"></div>
+        <div class="p-loc"  id="p-loc"></div>
+        <span class="dl">Hookups</span>
+        <div class="dv" id="p-hookups"></div>
+        <span class="dl">Highlights</span>
+        <div class="dv" id="p-highlights"></div>
+        <span class="adv-head">Choose Your Adventure</span>
+        <div class="adv-grid">
+          <button class="adv-btn" data-activity="RV"     data-icon="🚐"><span class="adv-icon">🚐</span>RV</button>
+          <button class="adv-btn" data-activity="Hike"   data-icon="🥾"><span class="adv-icon">🥾</span>Hike</button>
+          <button class="adv-btn" data-activity="Bike"   data-icon="🚴"><span class="adv-icon">🚴</span>Bike</button>
+          <button class="adv-btn" data-activity="Disc"   data-icon="🥏"><span class="adv-icon">🥏</span>Disc</button>
+          <button class="adv-btn" data-activity="Paddle" data-icon="🛶"><span class="adv-icon">🛶</span>Paddle</button>
+          <button class="adv-btn" data-activity="Bird"   data-icon="🦅"><span class="adv-icon">🦅</span>Bird</button>
+          <button class="adv-btn" data-activity="More"   data-icon="✨"><span class="adv-icon">✨</span>More</button>
+        </div>
+        <div class="p-actions">
+          <a class="btn-primary" href="https://reservations.gooutdoorslouisiana.com/" target="_blank" rel="noopener">Make a Reservation</a>
+          <a class="btn-ghost" id="p-park-link" href="#" target="_blank" rel="noopener">Official Park Page ↗</a>
+        </div>
+      </div>
+
+      <!-- COMING SOON DETAIL -->
+      <div id="cs-body">
+        <div class="cs-name" id="cs-name"></div>
+        <div class="cs-loc"  id="cs-loc"></div>
+        <p class="cs-msg">Video guide coming soon. Visit the official park page for maps, campsite details, and reservation info.</p>
+        <div class="cs-actions">
+          <a class="btn-primary" href="https://reservations.gooutdoorslouisiana.com/" target="_blank" rel="noopener">Make a Reservation</a>
+          <a class="btn-ghost" id="cs-link" href="#" target="_blank" rel="noopener">Official Park Page ↗</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <span class="f-txt">Data: <a href="https://www.lastateparks.com" target="_blank">lastateparks.com</a> · Louisiana Office of State Parks</span>
+  <span class="f-txt"><a href="https://www.explorelouisiana.com/state-parks" target="_blank">ExplorelouisiAna.com →</a></span>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var PARKS = [
+  {id:'bogue-chitto',  name:'Bogue Chitto State Park',           city:'Franklinton',    lat:30.8421,lng:-90.0774,url:'https://www.lastateparks.com/parks-preserves/bogue-chitto-state-park'},
+  {id:'chemin-a-haut', name:'Chemin-A-Haut State Park',          city:'Bastrop',        lat:32.9073,lng:-91.9468,url:'https://www.lastateparks.com/parks-preserves/chemin-a-haut-state-park'},
+  {id:'chicot',        name:'Chicot State Park',                  city:'Ville Platte',   lat:30.8185,lng:-92.2882,url:'https://www.lastateparks.com/parks-preserves/chicot-state-park'},
+  {id:'cypremort',     name:'Cypremort Point State Park',         city:'Cypremort Point',lat:29.7196,lng:-91.8802,url:'https://www.lastateparks.com/parks-preserves/cypremort-point-state-park'},
+  {id:'fairview',      name:'Fairview-Riverside State Park',      city:'Madisonville',   lat:30.4005,lng:-90.1540,url:'https://www.lastateparks.com/parks-preserves/fairview-riverside-state-park'},
+  {id:'fontainebleau', name:'Fontainebleau State Park',           city:'Mandeville',     lat:30.3602,lng:-90.0246,url:'https://www.lastateparks.com/parks-preserves/fontainebleau-state-park'},
+  {id:'grand-isle',    name:'Grand Isle State Park',              city:'Grand Isle',     lat:29.2338,lng:-89.9740,url:'https://www.lastateparks.com/parks-preserves/grand-isle-state-park'},
+  {id:'jimmie-davis',  name:'Jimmie Davis State Park',            city:'Chatham',        lat:32.0957,lng:-92.4432,url:'https://www.lastateparks.com/parks-preserves/jimmie-davis-state-park'},
+  {id:'lake-bistineau',name:'Lake Bistineau State Park',          city:'Doyline',        lat:32.5298,lng:-93.4021,url:'https://www.lastateparks.com/parks-preserves/lake-bistineau-state-park'},
+  {id:'lake-bruin',    name:'Lake Bruin State Park',              city:'St. Joseph',     lat:31.9257,lng:-91.2474,url:'https://www.lastateparks.com/parks-preserves/lake-bruin-state-park'},
+  {id:'lake-claiborne',name:'Lake Claiborne State Park',          city:'Homer',          lat:32.8213,lng:-93.0254,url:'https://www.lastateparks.com/parks-preserves/lake-claiborne-state-park'},
+  {id:'lake-darbonne', name:"Lake D'Arbonne State Park",          city:'Farmerville',    lat:32.7793,lng:-92.4760,url:'https://www.lastateparks.com/parks-preserves/lake-darbonne-state-park'},
+  {id:'lake-fausse',   name:'Lake Fausse Pointe State Park',      city:'St. Martinville',lat:29.9977,lng:-91.6627,url:'https://www.lastateparks.com/parks-preserves/lake-fausse-pointe-state-park'},
+  {id:'north-toledo',  name:'North Toledo Bend State Park',       city:'Zwolle',         lat:31.6096,lng:-93.6774,url:'https://www.lastateparks.com/parks-preserves/north-toledo-bend-state-park'},
+  {id:'palmetto',      name:'Palmetto Island State Park',         city:'Abbeville',      lat:29.8188,lng:-92.1355,url:'https://www.lastateparks.com/parks-preserves/palmetto-island-state-park'},
+  {id:'poverty-point', name:'Poverty Point Reservoir State Park', city:'Delhi',          lat:32.4329,lng:-91.5260,url:'https://www.lastateparks.com/parks-preserves/poverty-point-reservoir-state-park'},
+  {id:'sam-houston',   name:'Sam Houston Jones State Park',       city:'Lake Charles',   lat:30.3399,lng:-93.2638,url:'https://www.lastateparks.com/parks-preserves/sam-houston-jones-state-park'},
+  {id:'south-toledo',  name:'South Toledo Bend State Park',       city:'Anacoco',        lat:31.2657,lng:-93.5588,url:'https://www.lastateparks.com/parks-preserves/south-toledo-bend-state-park',
+    ytId:'x5LTXLlYqD0',
+    hookups:'20 amp, 30 amp & 50 amp · Water hookup at each site · Dump station on-site',
+    highlights:'Toledo Bend Reservoir · Bass fishing · ATV trails · Bald eagle habitat · Glamping tents · Lakefront cabins'},
+  {id:'tickfaw',       name:'Tickfaw State Park',                 city:'Springfield',    lat:30.4154,lng:-90.5060,url:'https://www.lastateparks.com/parks-preserves/tickfaw-state-park'},
+  {id:'lake-d-area',   name:"Lake D'Arbonne Preserve Area",       city:'Farmerville',    lat:32.7000,lng:-92.5500,url:'https://www.lastateparks.com/parks-preserves/lake-darbonne-state-park'}
+];
+
+var panel     = document.getElementById('panel');
+var vidHero   = document.getElementById('vid-hero');
+var vidSoon   = document.getElementById('vid-soon');
+var panelBody = document.getElementById('panel-body');
+var csBody    = document.getElementById('cs-body');
+var mapTip    = document.getElementById('map-tip');
+var advModal  = document.getElementById('adv-modal');
+var activeId  = null;
+var markers   = {};
+
+/* BUILD SIDEBAR */
+PARKS.forEach(function(p) {
+  var el = document.createElement('div');
+  el.className = 'pi' + (p.ytId ? ' live' : '');
+  el.id = 'pi-' + p.id;
+  var dot = document.createElement('div'); dot.className = 'pi-dot';
+  var txt = document.createElement('div'); txt.className = 'pi-text';
+  txt.innerHTML = '<div class="pi-name">' + p.name + '</div><div class="pi-city">' + p.city + ', LA</div>';
+  el.appendChild(dot);
+  el.appendChild(txt);
+  if (p.ytId) {
+    var b = document.createElement('span'); b.className = 'pi-badge'; b.textContent = '▶ Video';
+    el.appendChild(b);
+  }
+  el.addEventListener('click', function() { selectPark(p.id); });
+  document.getElementById('park-list').appendChild(el);
+});
+
+/* SELECT PARK */
+function selectPark(id) {
+  if (activeId) { var o = document.getElementById('pi-'+activeId); if(o) o.classList.remove('active'); }
+  activeId = id;
+  var el = document.getElementById('pi-'+id);
+  if (el) { el.classList.add('active'); el.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  var park = PARKS.find(function(p){return p.id===id;});
+  if (!park) return;
+  map.setView([park.lat, park.lng], 9, {animate:true});
+  if (markers[id]) markers[id].openPopup();
+  mapTip.classList.add('gone');
+  panel.classList.add('open');
+
+  if (park.ytId) {
+    vidHero.href = 'https://youtu.be/' + park.ytId;
+    document.getElementById('vid-poster').src = 'https://i.ytimg.com/vi/' + park.ytId + '/hqdefault.jpg';
+    vidHero.classList.add('show');
+    vidSoon.classList.remove('show');
+    panelBody.classList.add('show');
+    csBody.classList.remove('show');
+    document.getElementById('p-name').textContent       = park.name;
+    document.getElementById('p-loc').textContent        = park.city + ', Louisiana';
+    document.getElementById('p-hookups').textContent    = park.hookups;
+    document.getElementById('p-highlights').textContent = park.highlights;
+    document.getElementById('p-park-link').href         = park.url;
+  } else {
+    vidHero.classList.remove('show');
+    vidSoon.classList.add('show');
+    panelBody.classList.remove('show');
+    csBody.classList.add('show');
+    document.getElementById('cs-name').textContent = park.name;
+    document.getElementById('cs-loc').textContent  = park.city + ', Louisiana';
+    document.getElementById('cs-link').href        = park.url;
+  }
+}
+
+/* CLOSE */
+document.getElementById('btn-x').addEventListener('click', function() {
+  panel.classList.remove('open');
+  vidHero.classList.remove('show');
+  vidSoon.classList.remove('show');
+  panelBody.classList.remove('show');
+  csBody.classList.remove('show');
+  mapTip.classList.remove('gone');
+  if (activeId) { var o = document.getElementById('pi-'+activeId); if(o) o.classList.remove('active'); activeId=null; }
+});
+
+/* ADVENTURE MODAL */
+document.querySelectorAll('.adv-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.getElementById('am-icon').textContent  = btn.dataset.icon;
+    document.getElementById('am-title').textContent = btn.dataset.activity + ' Adventures';
+    advModal.classList.add('open');
+  });
+});
+document.getElementById('btn-am-close').addEventListener('click', function(){advModal.classList.remove('open');});
+advModal.addEventListener('click', function(e){if(e.target===advModal)advModal.classList.remove('open');});
+
+/* MAP */
+var map = L.map('map',{zoomControl:true}).setView([31.0,-92.0],7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  maxZoom:18
+}).addTo(map);
+
+PARKS.forEach(function(p) {
+  var live = !!p.ytId;
+  var pin  = live ? '#9C7744' : '#1C322C';
+  var ring = live ? 'rgba(156,119,68,.22)' : 'rgba(28,50,44,.12)';
+  var bdr  = live ? '#C4A06A' : 'rgba(28,50,44,.38)';
+  var icon = L.divIcon({
+    html:'<div style="position:relative;width:28px;height:28px;"><div style="position:absolute;inset:0;border-radius:50%;background:'+ring+';"></div><div style="position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:'+pin+';border:2px solid '+bdr+';box-shadow:0 1px 5px rgba(0,0,0,.28);"></div></div>',
+    className:'',iconSize:[28,28],iconAnchor:[14,28],popupAnchor:[0,-30]
+  });
+  var html='<div class="pop-inner"><div class="pop-name">'+p.name+'</div><div class="pop-city">'+p.city+', Louisiana</div>'+(live?'<div class="pop-vtag">&#9654;&nbsp;Video Available</div>':'')+'</div>';
+  var m = L.marker([p.lat,p.lng],{icon:icon}).addTo(map);
+  m.bindPopup(html,{maxWidth:230,closeButton:true});
+  m.on('click',function(){selectPark(p.id);});
+  markers[p.id]=m;
+});
+
+/* AUTO-OPEN ON LOAD */
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    map.setView([31.2657,-93.5588],8,{animate:false});
+    selectPark('south-toledo');
+  },350);
+});
+</script>
+</body>
+</html>
